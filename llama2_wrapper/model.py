@@ -1,3 +1,4 @@
+# coding:utf-8
 from threading import Thread
 from typing import Any, Iterator
 
@@ -101,13 +102,32 @@ class LLAMA2_WRAPPER:
 
             generator = self.model.generate(inputs, **generate_kwargs)
             outputs = []
+            answer_message =''
+            new_tokens = []
             for token in generator:
-                if token == self.model.token_eos():
+                if token!='</s>':
+                    try:
+                        new_tokens.append(token)
+                        b_text = self.model.detokenize(new_tokens)
+                        # b_text = self.model.decode(new_tokens)
+                        answer_message+=str(b_text, encoding="utf-8")
+                        new_tokens = []
+                    except:
+                        pass
+                else:
+                    yield answer_message
                     break
-                b_text = self.model.detokenize([token])
-                text = str(b_text, encoding="utf-8")
-                outputs.append(text)
-                yield "".join(outputs)
+
+                if 'Human:' in answer_message:
+                    answer_message = answer_message.split('Human:')[0]
+                    yield answer_message
+                    break
+                
+                if token == self.model.token_eos():
+                    yield answer_message
+                    break
+                
+                yield answer_message
         else:
             from transformers import TextIteratorStreamer
 
@@ -140,7 +160,7 @@ class LLAMA2_WRAPPER:
         chat_history: list[tuple[str, str]],
         system_prompt: str,
         max_new_tokens: int = 1024,
-        temperature: float = 0.8,
+        temperature: float = 0.3,
         top_p: float = 0.95,
         top_k: int = 50,
     ) -> Iterator[str]:
@@ -163,8 +183,15 @@ class LLAMA2_WRAPPER:
 def get_prompt(
     message: str, chat_history: list[tuple[str, str]], system_prompt: str
 ) -> str:
-    texts = [f"[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n"]
+    prompt = ''
     for user_input, response in chat_history:
-        texts.append(f"{user_input.strip()} [/INST] {response.strip()} </s><s> [INST] ")
-    texts.append(f"{message.strip()} [/INST]")
-    return "".join(texts)
+        prompt += "<s>Human: " + user_input.strip()+"\n</s><s>Assistant: " + response.strip()+"\n</s>"
+        
+    prompt += "<s>Human: " + message.strip() +"\n</s><s>Assistant: "
+    prompt = prompt[-2048:]
+    
+    if len(system_prompt)>0:
+        prompt = '<s>System: '+system_prompt.strip()+'\n</s>'+ prompt
+    return prompt
+
+

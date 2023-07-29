@@ -1,44 +1,46 @@
+import argparse
+
 import os
 from typing import Iterator
 
 import gradio as gr
 
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from distutils.util import strtobool
 
 from llama2_wrapper import LLAMA2_WRAPPER
 
-load_dotenv()
 
-DEFAULT_SYSTEM_PROMPT = (
-    os.getenv("DEFAULT_SYSTEM_PROMPT")
-    if os.getenv("DEFAULT_SYSTEM_PROMPT") is not None
-    else ""
-)
-MAX_MAX_NEW_TOKENS = (
-    int(os.getenv("MAX_MAX_NEW_TOKENS"))
-    if os.getenv("DEFAULT_MAX_NEW_TOKENS") is not None
-    else 2048
-)
-DEFAULT_MAX_NEW_TOKENS = (
-    int(os.getenv("DEFAULT_MAX_NEW_TOKENS"))
-    if os.getenv("DEFAULT_MAX_NEW_TOKENS") is not None
-    else 1024
-)
-MAX_INPUT_TOKEN_LENGTH = (
-    int(os.getenv("MAX_INPUT_TOKEN_LENGTH"))
-    if os.getenv("MAX_INPUT_TOKEN_LENGTH") is not None
-    else 4000
-)
+parser = argparse.ArgumentParser()
 
-MODEL_PATH = os.getenv("MODEL_PATH")
+DEFAULT_SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."
+
+parser.add_argument('--model_path', type=str, required=True, default='',
+                    help='model_path .')
+
+parser.add_argument('--system_prompt', type=str, required=False, default=DEFAULT_SYSTEM_PROMPT,
+                    help='Inference server Appkey. Default is .')
+
+parser.add_argument('--max_max_new_tokens', type=int, default=2048, metavar='NUMBER',
+                        help='maximum new tokens (default: 2048)')
+
+FLAGS = parser.parse_args()
+
+
+DEFAULT_SYSTEM_PROMPT = FLAGS.system_prompt
+MAX_MAX_NEW_TOKENS = FLAGS.max_max_new_tokens
+
+DEFAULT_MAX_NEW_TOKENS = 1024
+MAX_INPUT_TOKEN_LENGTH = 4000
+
+MODEL_PATH = FLAGS.model_path
 assert MODEL_PATH is not None, f"MODEL_PATH is required, got: {MODEL_PATH}"
 
-LOAD_IN_8BIT = bool(strtobool(os.getenv("LOAD_IN_8BIT", "True")))
+LOAD_IN_8BIT = False
 
-LOAD_IN_4BIT = bool(strtobool(os.getenv("LOAD_IN_4BIT", "True")))
+LOAD_IN_4BIT = True
 
-LLAMA_CPP = bool(strtobool(os.getenv("LLAMA_CPP", "True")))
+LLAMA_CPP = True
 
 if LLAMA_CPP:
     print("Running on CPU with llama.cpp.")
@@ -62,13 +64,12 @@ llama2_wrapper.init_tokenizer()
 llama2_wrapper.init_model()
 
 DESCRIPTION = """
-# llama2-webui
+# Llama2-Chinese-7b-webui
 
-This is a chatbot based on Llama-2. 
-- Supporting models: [Llama-2-7b](https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGML)/[13b](https://huggingface.co/llamaste/Llama-2-13b-chat-hf)/[70b](https://huggingface.co/llamaste/Llama-2-70b-chat-hf), all [Llama-2-GPTQ](https://huggingface.co/TheBloke/Llama-2-7b-Chat-GPTQ), all [Llama-2-GGML](https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGML) ...
-- Supporting model backends
-  - Nvidia GPU(at least 6 GB VRAM): tranformers, [bitsandbytes(8-bit inference)](https://github.com/TimDettmers/bitsandbytes), [AutoGPTQ(4-bit inference)](https://github.com/PanQiWei/AutoGPTQ)
-  - CPU(at least 6 GB RAM), Mac/AMD GPU: [llama.cpp](https://github.com/ggerganov/llama.cpp)
+这是一个[Llama2-Chinese-2-7b](https://github.com/FlagAlpha/Llama2-Chinese)的推理界面。 
+- 支持的模型: [Llama-2-GGML](https://huggingface.co/FlagAlpha/Llama2-Chinese-7b-Chat-GGML)
+- 支持的后端
+  - CPU(at least 6 GB RAM), Mac/AMD
 """
 
 
@@ -192,9 +193,6 @@ with gr.Blocks(css="style.css") as demo:
         examples=[
             "Hello there! How are you doing?",
             "Can you explain briefly to me what is the Python programming language?",
-            "Explain the plot of Cinderella in a sentence.",
-            "How many hours does it take a man to eat a Helicopter?",
-            "Write a 100-word article on 'Benefits of Open-Source in AI research'",
         ],
         inputs=textbox,
         outputs=[textbox, chatbot],
@@ -319,4 +317,4 @@ with gr.Blocks(css="style.css") as demo:
         api_name=False,
     )
 
-demo.queue(max_size=20).launch()
+demo.queue(max_size=20).launch(server_name="0.0.0.0", server_port=8090)
